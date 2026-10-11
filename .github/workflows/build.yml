@@ -1,0 +1,51 @@
+name: build
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch upstream hysteria
+        run: git clone --depth 1 --branch core/v2.13.0 https://github.com/apernet/hysteria upstream
+
+      - name: Apply ZIVPN wire-compat patch
+        run: python3 tools/apply_compat.py upstream
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: upstream/app/go.mod
+          cache-dependency-path: upstream/app/go.sum
+
+      - name: Build server (patched hysteria)
+        working-directory: upstream/app
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/dist"
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags "-s -w" -o "$GITHUB_WORKSPACE/dist/zivpn-compat-linux-amd64" .
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -ldflags "-s -w" -o "$GITHUB_WORKSPACE/dist/zivpn-compat-linux-arm64" .
+
+      - name: Build panel (auth + quota)
+        working-directory: panel
+        run: |
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags "-s -w" -o "$GITHUB_WORKSPACE/dist/zivpn-compat-panel-linux-amd64" ./cmd/panel
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -ldflags "-s -w" -o "$GITHUB_WORKSPACE/dist/zivpn-compat-panel-linux-arm64" ./cmd/panel
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: zivpn-compat-linux
+          path: dist/
+
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*

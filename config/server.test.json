@@ -1,0 +1,22 @@
+{
+  "listen": ":5667",
+  "tls": {
+    "cert": "/etc/zivpn-compat/zivpn.crt",
+    "key": "/etc/zivpn-compat/zivpn.key",
+    "sniGuard": "disable"
+  },
+  "obfs": {
+    "type": "salamander",
+    "salamander": {
+      "password": "zivpn"
+    }
+  },
+  "auth": {
+    "type": "password",
+    "password": "zi"
+  },
+  "trafficStats": {
+    "listen": "127.0.0.1:9999",
+    "secret": "change-me-stats-secret"
+  }
+}
